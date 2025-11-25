@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Card Game Tracker - Joe vs Siggi</title>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    
+    <!-- React -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDrAhZosJCgo6wWyBsN5lMpGLZXsxc9weY",
+            authDomain: "card-game-tracker-1f5dd.firebaseapp.com",
+            databaseURL: "https://card-game-tracker-1f5dd-default-rtdb.firebaseio.com",
+            projectId: "card-game-tracker-1f5dd",
+            storageBucket: "card-game-tracker-1f5dd.firebasestorage.app",
+            messagingSenderId: "814317215030",
+            appId: "1:814317215030:web:32aa794c2e13d59efc2797",
+            measurementId: "G-610H3Z4XQJ"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        const { useState, useEffect } = React;
+
+        function CardGameTracker() {
+            const [games, setGames] = useState({
+                casino: { joe: 0, siggi: 0 },
+                rummy: { joe: 0, siggi: 0 }
+            });
+            
+            const [history, setHistory] = useState([]);
+            const [selectedGame, setSelectedGame] = useState('');
+            const [selectedWinner, setSelectedWinner] = useState('');
+            const [showScores, setShowScores] = useState(false);
+            const [justAdded, setJustAdded] = useState(false);
+            const [isLoading, setIsLoading] = useState(true);
+
+            // Load data from Firebase on mount and listen for changes
+            useEffect(() => {
+                const gamesRef = database.ref('games');
+                const historyRef = database.ref('history');
+
+                // Listen for changes to games
+                gamesRef.on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        setGames(data);
+                    }
+                    setIsLoading(false);
+                });
+
+                // Listen for changes to history
+                historyRef.on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        setHistory(data);
+                    }
+                });
+
+                // Cleanup listeners on unmount
+                return () => {
+                    gamesRef.off();
+                    historyRef.off();
+                };
+            }, []);
+
+            const addWin = () => {
+                if (selectedGame && selectedWinner) {
+                    // Save current state to history
+                    const newHistory = [...history, { ...games }];
+                    database.ref('history').set(newHistory);
+                    
+                    // Update games
+                    const newGames = {
+                        ...games,
+                        [selectedGame]: {
+                            ...games[selectedGame],
+                            [selectedWinner]: games[selectedGame][selectedWinner] + 1
+                        }
+                    };
+                    database.ref('games').set(newGames);
+                    
+                    setJustAdded(true);
+                    setTimeout(() => setJustAdded(false), 2000);
+                    setSelectedGame('');
+                    setSelectedWinner('');
+                }
+            };
+
+            const resetScores = () => {
+                if (window.confirm('Are you sure you want to reset all scores?')) {
+                    // Save current state to history
+                    const newHistory = [...history, { ...games }];
+                    database.ref('history').set(newHistory);
+                    
+                    // Reset games
+                    const resetGames = {
+                        casino: { joe: 0, siggi: 0 },
+                        rummy: { joe: 0, siggi: 0 }
+                    };
+                    database.ref('games').set(resetGames);
+                }
+            };
+
+            const undoLastAction = () => {
+                if (history.length > 0) {
+                    const previousState = history[history.length - 1];
+                    database.ref('games').set(previousState);
+                    
+                    const newHistory = history.slice(0, -1);
+                    database.ref('history').set(newHistory);
+                }
+            };
+
+            const getLeader = (game) => {
+                const joeScore = games[game].joe;
+                const siggiScore = games[game].siggi;
+                if (joeScore > siggiScore) return { name: 'Joe', lead: joeScore - siggiScore };
+                if (siggiScore > joeScore) return { name: 'Siggi', lead: siggiScore - joeScore };
+                return { name: 'Tied', lead: 0 };
+            };
+
+            const getOverallLeader = () => {
+                const joeTotal = games.casino.joe + games.rummy.joe;
+                const siggiTotal = games.casino.siggi + games.rummy.siggi;
+                if (joeTotal > siggiTotal) return { name: 'Joe', total: joeTotal, lead: joeTotal - siggiTotal };
+                if (siggiTotal > joeTotal) return { name: 'Siggi', total: siggiTotal, lead: siggiTotal - joeTotal };
+                return { name: 'Tied', total: joeTotal, lead: 0 };
+            };
+
+            const overall = getOverallLeader();
+
+            // Simple SVG components
+            const Trophy = () => (
+                <svg className="w-10 h-10 text-yellow-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                </svg>
+            );
+
+            const Target = () => (
+                <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            );
+
+            const TrendingUp = () => (
+                <svg className="w-6 h-6 text-yellow-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+            );
+
+            if (isLoading) {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-teal-800 to-cyan-900 flex items-center justify-center">
+                        <div className="text-white text-2xl">Loading scores from database... 🎰🃏</div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-teal-800 to-cyan-900 p-4 md:p-8">
+                    <div className="max-w-4xl mx-auto">
+                        {/* Header */}
+                        <div className="text-center mb-8">
+                            <div className="flex items-center justify-center gap-3 mb-2">
+                                <Trophy />
+                                <h1 className="text-4xl md:text-5xl font-bold text-white">Card Game Tracker</h1>
+                                <Trophy />
+                            </div>
+                            <p className="text-emerald-200 text-lg">Joe vs Siggi: Casino & Rummy</p>
+                            <p className="text-emerald-300 text-sm mt-2">✨ Real-time sync enabled!</p>
+                        </div>
+
+                        {/* Overall Leader Board */}
+                        <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 mb-6 border-2 border-white/20">
+                            <div className="flex items-center justify-center gap-2 mb-4">
+                                <TrendingUp />
+                                <h2 className="text-2xl font-bold text-white">Overall Championship</h2>
+                            </div>
+                            <div className="text-center">
+                                {overall.name === 'Tied' ? (
+                                    <p className="text-3xl font-bold text-yellow-300">Perfect Tie! 🤝</p>
+                                ) : (
+                                    <>
+                                        <p className="text-4xl font-bold text-yellow-300">{overall.name} Leads!</p>
+                                        <p className="text-xl text-white mt-2">By {overall.lead} {overall.lead === 1 ? 'game' : 'games'}</p>
+                                    </>
+                                )}
+                                <div className="flex justify-center gap-8 mt-4">
+                                    <div className="text-center">
+                                        <p className="text-emerald-200">Joe</p>
+                                        <p className="text-3xl font-bold text-white">{games.casino.joe + games.rummy.joe}</p>
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-emerald-200">Siggi</p>
+                                        <p className="text-3xl font-bold text-white">{games.casino.siggi + games.rummy.siggi}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Add Game Section */}
+                        <div className="bg-white/95 backdrop-blur-lg rounded-2xl shadow-2xl p-6 md:p-8 mb-6">
+                            <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                                <Target />
+                                Log a Game
+                            </h2>
+                            
+                            {justAdded && (
+                                <div className="bg-green-100 border-2 border-green-500 text-green-800 px-4 py-3 rounded-lg mb-4 text-center font-semibold">
+                                    ✓ Game recorded and synced!
+                                </div>
+                            )}
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-gray-700 font-semibold mb-2">Which game?</label>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <button
+                                            onClick={() => setSelectedGame('casino')}
+                                            className={`py-4 px-6 rounded-xl font-bold text-lg transition-all ${
+                                                selectedGame === 'casino'
+                                                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg scale-105'
+                                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                            }`}
+                                        >
+                                            🎰 Casino
+                                        </button>
+                                        <button
+                                            onClick={() => setSelectedGame('rummy')}
+                                            className={`py-4 px-6 rounded-xl font-bold text-lg transition-all ${
+                                                selectedGame === 'rummy'
+                                                    ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg scale-105'
+                                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                            }`}
+                                        >
+                                            🃏 Rummy
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-gray-700 font-semibold mb-2">Who won?</label>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <button
+                                            onClick={() => setSelectedWinner('joe')}
+                                            className={`py-4 px-6 rounded-xl font-bold text-lg transition-all ${
+                                                selectedWinner === 'joe'
+                                                    ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg scale-105'
+                                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                            }`}
+                                        >
+                                            🏆 Joe
+                                        </button>
+                                        <button
+                                            onClick={() => setSelectedWinner('siggi')}
+                                            className={`py-4 px-6 rounded-xl font-bold text-lg transition-all ${
+                                                selectedWinner === 'siggi'
+                                                    ? 'bg-gradient-to-r from-orange-600 to-red-600 text-white shadow-lg scale-105'
+                                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                            }`}
+                                        >
+                                            🏆 Siggi
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <button
+                                    onClick={addWin}
+                                    disabled={!selectedGame || !selectedWinner}
+                                    className={`w-full py-4 px-6 rounded-xl font-bold text-lg transition-all ${
+                                        selectedGame && selectedWinner
+                                            ? 'bg-gradient-to-r from-yellow-500 to-amber-600 text-white hover:shadow-xl hover:scale-105'
+                                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                    }`}
+                                >
+                                    Record Win 🎉
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* View Scores Button */}
+                        <div className="text-center mb-6">
+                            <button
+                                onClick={() => setShowScores(!showScores)}
+                                className="bg-white/20 backdrop-blur-lg border-2 border-white/40 text-white font-bold py-3 px-8 rounded-xl hover:bg-white/30 transition-all"
+                            >
+                                {showScores ? '🔽 Hide Scores' : '📊 Show Detailed Scores'}
+                            </button>
+                        </div>
+
+                        {/* Detailed Scores */}
+                        {showScores && (
+                            <div className="space-y-4">
+                                {/* Casino Scores */}
+                                <div className="bg-gradient-to-r from-purple-600/90 to-pink-600/90 backdrop-blur-lg rounded-2xl p-6 text-white">
+                                    <h3 className="text-2xl font-bold mb-4 flex items-center gap-2">
+                                        🎰 Casino
+                                    </h3>
+                                    <div className="grid grid-cols-2 gap-6">
+                                        <div className="text-center">
+                                            <p className="text-lg opacity-90">Joe</p>
+                                            <p className="text-5xl font-bold">{games.casino.joe}</p>
+                                        </div>
+                                        <div className="text-center">
+                                            <p className="text-lg opacity-90">Siggi</p>
+                                            <p className="text-5xl font-bold">{games.casino.siggi}</p>
+                                        </div>
+                                    </div>
+                                    <div className="mt-4 text-center">
+                                        {getLeader('casino').name !== 'Tied' ? (
+                                            <p className="text-lg font-semibold">
+                                                {getLeader('casino').name} leads by {getLeader('casino').lead}
+                                            </p>
+                                        ) : (
+                                            <p className="text-lg font-semibold">Tied!</p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Rummy Scores */}
+                                <div className="bg-gradient-to-r from-blue-600/90 to-cyan-600/90 backdrop-blur-lg rounded-2xl p-6 text-white">
+                                    <h3 className="text-2xl font-bold mb-4 flex items-center gap-2">
+                                        🃏 Rummy
+                                    </h3>
+                                    <div className="grid grid-cols-2 gap-6">
+                                        <div className="text-center">
+                                            <p className="text-lg opacity-90">Joe</p>
+                                            <p className="text-5xl font-bold">{games.rummy.joe}</p>
+                                        </div>
+                                        <div className="text-center">
+                                            <p className="text-lg opacity-90">Siggi</p>
+                                            <p className="text-5xl font-bold">{games.rummy.siggi}</p>
+                                        </div>
+                                    </div>
+                                    <div className="mt-4 text-center">
+                                        {getLeader('rummy').name !== 'Tied' ? (
+                                            <p className="text-lg font-semibold">
+                                                {getLeader('rummy').name} leads by {getLeader('rummy').lead}
+                                            </p>
+                                        ) : (
+                                            <p className="text-lg font-semibold">Tied!</p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Reset and Undo Buttons */}
+                        <div className="text-center mt-8 flex justify-center gap-4 flex-wrap">
+                            <button
+                                onClick={undoLastAction}
+                                disabled={history.length === 0}
+                                className={`font-semibold py-2 px-6 rounded-lg transition-all ${
+                                    history.length > 0
+                                        ? 'bg-amber-600/80 backdrop-blur-lg text-white hover:bg-amber-700'
+                                        : 'bg-gray-400/50 text-gray-300 cursor-not-allowed'
+                                }`}
+                            >
+                                ↶ Undo Last Action
+                            </button>
+                            <button
+                                onClick={resetScores}
+                                className="bg-red-600/80 backdrop-blur-lg text-white font-semibold py-2 px-6 rounded-lg hover:bg-red-700 transition-all"
+                            >
+                                Reset All Scores
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Render the app
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<CardGameTracker />);
+    </script>
+</body>
+</html>
