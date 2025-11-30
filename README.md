@@ -1,9 +1,11 @@
-This project involved creating an html file from Claude.ai with a prompt in order to create an app that allows two specific users 
-the ability to keep track of a running score for two card games, Rummy and Casino.  I envisioned this app because my girlfriend
-and I play both of these games and have done so for at least two years, and I wondered who has won more games.  For now, the app
-only allows each of us to enter a score and the scores are not synched.  For example, when I enter a score from my computer, and she
-enters one from her's, the scores are not synced up.  This is because there is no backend database.  The next version, which I am
-working on now, will have a backend database so that the score is synced and whenever either of us launches the app from our 
-separate computers, we'll both see the running score.  The app also allows to reset the score back to zero and also has an Undue 
-function to correct any past mistakes.  My next project after this will be to create the game, Casino, as a multi-user interactive
-game.  There aren't any online games like this for Casino, so I'm excited to try to create one.
+I used Claude to help me create an app and deploy it.  The app allows multiple users of multiple games (competitions) to
+to keep track of any game competition with a running score. Multiple trackers can run simultaneously.
+An admin initializes the game and a code is generated for other users to join the Tracker.
+Any user can update a score while seeing who is winning at the bottom of the screen.
+The History of changes shows 1. who won the game, 2. who is winning the game or if its tied,
+3. Who updated the score, and 4. if the Admin did an Undue of the last action or reset the
+score.  By allowing any user to update the score, the app allows full engagement of all users,
+while also maintaining control of the scoring by the Admin, just in case someone tries to cheat
+or in case multiple users updated the same game.  All users can see who updated the last score.
+This tracking app is a simple way for game players who play a game over a long period of time
+to keep track of who is winning over that time frame.  
